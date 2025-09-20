@@ -87,7 +87,7 @@ class QuickBuyPro:
                     except (psutil.NoSuchProcess, psutil.AccessDenied):
                         pass
             except ImportError:
-                print("INFO: psutil not available, using basic process cleanup")
+                pass
             
             # Also try traditional pkill as backup
             subprocess.run(['pkill', '-f', 'chrome'], capture_output=True)
@@ -99,7 +99,7 @@ class QuickBuyPro:
         except:
             pass
         
-        # Clean up existing user data directory if it exists and has conflicts
+        # Clean up existing user data directory only if there are conflicts
         if os.path.exists(self.user_data_dir):
             try:
                 import glob
@@ -124,27 +124,29 @@ class QuickBuyPro:
                         except:
                             pass
                 
-                # If we found locks, wait a bit more and try to clean the entire directory
+                # Only clean the entire directory if we found locks and couldn't remove them individually
                 if has_locks:
-                    print(f"INFO: Found lock files, cleaning user data directory...")
                     time.sleep(2)
+                    # Try to create a new directory to test if the old one is still locked
+                    test_dir = self.user_data_dir + "_test"
                     try:
-                        shutil.rmtree(self.user_data_dir)
-                        print(f"INFO: Removed existing user data directory")
+                        os.makedirs(test_dir, exist_ok=True)
+                        shutil.rmtree(test_dir)
+                        # User data directory is accessible, keeping existing data
                     except:
-                        print(f"WARNING: Could not remove user data directory, will try to use it")
-                else:
-                    print(f"INFO: Using existing user data directory: {self.user_data_dir}")
+                        # If we can't create a test directory, the original might be locked
+                        try:
+                            shutil.rmtree(self.user_data_dir)
+                        except:
+                            pass
             except Exception as e:
-                print(f"WARNING: Could not clean existing user data directory: {e}")
+                pass
         
         # Create user data directory if it doesn't exist
         if not os.path.exists(self.user_data_dir):
             try:
                 os.makedirs(self.user_data_dir, exist_ok=True)
-                print(f"INFO: Created user data directory: {self.user_data_dir}")
             except Exception as e:
-                print(f"WARNING: Could not create user data directory: {e}")
                 # Use a fallback directory
                 self.user_data_dir = os.path.join(os.getcwd(), "temp_user_data")
                 os.makedirs(self.user_data_dir, exist_ok=True)
@@ -170,7 +172,7 @@ class QuickBuyPro:
             chrome_options.add_experimental_option('useAutomationExtension', False)
             chrome_options.add_experimental_option("detach", True)
         except Exception as e:
-            print(f"WARNING: Error setting Chrome options: {e}")
+            pass
 
         try:
             # Use webdriver-manager to automatically download and manage ChromeDriver
@@ -201,7 +203,7 @@ class QuickBuyPro:
         try:
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         except Exception as e:
-            print(f"WARNING: Could not remove automation indicators: {e}")
+            pass
         
         return self.driver
 
@@ -219,7 +221,7 @@ class QuickBuyPro:
             # Check for "Profile Information" text
             try:
                 profile_info = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Profile Information')]")
-                print("SUCCESS: User is logged in! Profile Information found.")
+                print("✅ User is logged in!")
                 self.is_logged_in = True
                 return True
             except NoSuchElementException:
@@ -228,27 +230,27 @@ class QuickBuyPro:
             # Check for login indicator class
             try:
                 login_element = self.driver.find_element(By.CLASS_NAME, "PbekyG.xrBehW")
-                print("SUCCESS: User is logged in! Login indicator class found.")
+                print("✅ User is logged in!")
                 self.is_logged_in = True
                 return True
             except NoSuchElementException:
                 pass
 
             # If neither found, user is not logged in
-            print("WARNING: User is not logged in. Redirected to login page.")
-            print("INFO: Please login in the browser. System will automatically detect when you're logged in.")
+            print("❌ User is not logged in.")
+            print("Please login in the browser. System will automatically detect when you're logged in.")
             self.is_logged_in = False
             return False
 
         except Exception as e:
-            print(f"ERROR: Error checking login status: {e}")
+            print(f"❌ Error checking login status: {e}")
             self.is_logged_in = False
             return False
 
     def wait_for_login(self):
         """Continuously check for login until user logs in"""
         print("Waiting for user to login...")
-        print("INFO: Please login in the browser window. System will detect automatically when you're done.")
+        print("Please login in the browser window. System will detect automatically when you're done.")
 
         while True:
             try:
@@ -260,9 +262,9 @@ class QuickBuyPro:
                 # Check for "Profile Information" text
                 try:
                     profile_info = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Profile Information')]")
-                    print("SUCCESS: Login detected! Profile Information found.")
-                    print("INFO: User data has been saved. You'll stay logged in for next time.")
-                    print("INFO: Closing browser and proceeding with automation...")
+                    print("✅ Login detected!")
+                    print("User data has been saved. You'll stay logged in for next time.")
+                    print("Closing browser and proceeding with automation...")
                     self.is_logged_in = True
                     self.close()
                     return True
@@ -272,9 +274,9 @@ class QuickBuyPro:
                 # Check for login indicator class
                 try:
                     login_element = self.driver.find_element(By.CLASS_NAME, "PbekyG.xrBehW")
-                    print("SUCCESS: Login detected! Login indicator class found.")
-                    print("INFO: User data has been saved. You'll stay logged in for next time.")
-                    print("INFO: Closing browser and proceeding with automation...")
+                    print("✅ Login detected!")
+                    print("User data has been saved. You'll stay logged in for next time.")
+                    print("Closing browser and proceeding with automation...")
                     self.is_logged_in = True
                     self.close()
                     return True
@@ -289,10 +291,9 @@ class QuickBuyPro:
                     self.check_and_handle_popups()
 
             except KeyboardInterrupt:
-                print("\nINFO: Login waiting cancelled by user.")
+                print("\nLogin waiting cancelled by user.")
                 return False
             except Exception as e:
-                print(f"WARNING: Error while waiting for login: {e}")
                 time.sleep(5)
                 continue
 
@@ -322,7 +323,7 @@ class QuickBuyPro:
             if expiry_date and "/" in expiry_date and len(expiry_date) == 5:
                 expiry_date = expiry_date.replace("/", " / ")
         else:
-            print("INFO: Card details will not be prefilled. You'll enter them manually during automation.")
+            print("Card details will not be prefilled. You'll enter them manually during automation.")
 
         print("\nExecution Timing:")
         print("1. Execute Now")
@@ -341,7 +342,7 @@ class QuickBuyPro:
                 try:
                     scheduled_date = datetime.strptime(date_input, "%d/%m/%Y").date()
                 except:
-                    print("ERROR: Invalid date format, using today")
+                    print("Invalid date format, using today")
                     scheduled_date = datetime.now().date()
 
             try:
@@ -349,13 +350,13 @@ class QuickBuyPro:
                 scheduled_time = datetime.combine(scheduled_date, scheduled_time_obj)
 
                 if scheduled_time <= datetime.now():
-                    print("WARNING: Scheduled time is in the past, executing now instead")
+                    print("Scheduled time is in the past, executing now instead")
                     scheduled_time = None
                 else:
-                    print(f"SUCCESS: Scheduled for: {scheduled_time.strftime('%d/%m/%Y at %H:%M')}")
-                    print("INFO: Keep this tool running for scheduled execution")
+                    print(f"✅ Scheduled for: {scheduled_time.strftime('%d/%m/%Y at %H:%M')}")
+                    print("Keep this tool running for scheduled execution")
             except:
-                print("ERROR: Invalid time format, executing now")
+                print("Invalid time format, executing now")
                 scheduled_time = None
 
         return {
@@ -524,10 +525,8 @@ class QuickBuyPro:
                 try:
                     element = self.driver.find_element(By.XPATH, selector)
                     if element.is_displayed() and element.is_enabled():
-                        print("INFO: Found Accept & Continue button, clicking...")
                         element.click()
                         time.sleep(1.5)  # Reduced from 2 seconds
-                        print("SUCCESS: Accept & Continue clicked, continuing automation...")
                         return True
                 except:
                     continue
@@ -545,12 +544,10 @@ class QuickBuyPro:
 
         # Skip session-specific URLs that might be expired
         if cmd_type == 'open' and ('token=' in target or 'payments?' in target):
-            print(f"INFO: Skipping session-specific URL: {target[:50]}...")
             return True
 
         # Skip problematic step 5 that causes delays
         if cmd_type == 'clickAndWait' and 'container"]/div/div/div/div/button' in target:
-            print(f"INFO: Skipping problematic step: {target[:50]}...")
             return True
 
         # Don't print executing logs - will be handled by step descriptions
@@ -560,7 +557,7 @@ class QuickBuyPro:
                 # Validate and clean URL before opening
                 cleaned_url, error = self.validate_url(target)
                 if error:
-                    print(f"WARNING: {error}")
+                    print(f"❌ {error}")
                     return False
                 
                 try:
@@ -569,8 +566,7 @@ class QuickBuyPro:
                     # Check for popups after page load
                     self.check_and_handle_popups()
                 except Exception as url_error:
-                    print(f"ERROR: Failed to open URL: {url_error}")
-                    print(f"URL: {cleaned_url[:100]}...")
+                    print(f"❌ Failed to open URL: {url_error}")
                     return False
 
             elif cmd_type == 'click':
@@ -582,7 +578,6 @@ class QuickBuyPro:
                     element.click()
                     time.sleep(0.5)  # Reduced from 1 second
                 else:
-                    print(f"WARNING: Element not found for click: {target}")
                     return False
 
             elif cmd_type == 'clickAndWait':
@@ -596,13 +591,11 @@ class QuickBuyPro:
                     # Check for popups after clickAndWait since it might load new content
                     self.check_and_handle_popups()
                 else:
-                    print(f"WARNING: Element not found for clickAndWait: {target}")
                     return False
 
             elif cmd_type == 'type':
                 # Skip typing if value is empty (user chose not to prefill)
                 if not value:
-                    print(f"   INFO: Skipping field - will be filled manually")
                     return True
 
                 element = self.find_element_by_target(target, targets)
@@ -618,13 +611,12 @@ class QuickBuyPro:
                     element.send_keys(value)
                     time.sleep(0.5)  # Reduced from 1 second
                 else:
-                    print(f"WARNING: Element not found for type: {target}")
                     return False
 
             return True
 
         except Exception as e:
-            print(f"ERROR: Error executing command {cmd_type}: {e}")
+            print(f"❌ Error executing command {cmd_type}: {e}")
             return False
 
     def find_element_by_target(self, target, targets=None):
@@ -718,10 +710,10 @@ class QuickBuyPro:
             success = self.execute_command(step)
 
             if not success:
-                print(f"   WARNING: Step failed, continuing...")
+                print(f"   ⚠️  Step failed, continuing...")
                 continue
             else:
-                print(f"   SUCCESS: Completed")
+                print(f"   ✅ Completed")
 
         print("\nAutomation completed successfully!")
 
@@ -737,27 +729,25 @@ class QuickBuyPro:
                 elif 'cvv-input' in target:
                     step['Value'] = user_inputs['cvv']
 
-    def close(self):
-        """Close the browser and manage user data based on login status"""
+    def close(self, logout=False):
+        """Close the browser and manage user data based on logout preference"""
         if self.driver:
-            if self.is_logged_in:
-                print("INFO: Saving user data...")
+            if logout:
+                print("Logging out and cleaning up user data...")
                 time.sleep(2)
                 self.driver.quit()
-                print("SUCCESS: Browser closed. User data saved!")
-            else:
-                print("INFO: User not logged in, cleaning up user data...")
-                time.sleep(2)
-                self.driver.quit()
-                # Delete user data directory if user is not logged in
+                # Delete user data directory on logout
                 try:
                     import shutil
                     if os.path.exists(self.user_data_dir):
                         shutil.rmtree(self.user_data_dir)
-                        print("INFO: User data directory cleaned up.")
                 except Exception as e:
-                    print(f"WARNING: Could not clean user data directory: {e}")
-                print("SUCCESS: Browser closed. User data cleaned up!")
+                    pass
+                print("✅ Browser closed. User logged out!")
+            else:
+                time.sleep(2)
+                self.driver.quit()
+                print("✅ Browser closed. User data saved!")
 
 def check_scheduled_execution():
     """Check if there's a scheduled execution on startup"""
@@ -806,7 +796,7 @@ def check_scheduled_execution():
                     return scheduled_data
 
                 except KeyboardInterrupt:
-                    print("\n❌ Scheduled execution cancelled by user")
+                    print("\nScheduled execution cancelled by user")
                     automation.clear_schedule()
                     return None
         else:
@@ -833,10 +823,10 @@ def main():
             if not is_logged_in:
                 login_success = automation.wait_for_login()
                 if not login_success:
-                    print("ERROR: Login cancelled or failed.")
+                    print("❌ Login cancelled or failed.")
                     return
             else:
-                print("SUCCESS: Already logged in! Proceeding...")
+                print("✅ Already logged in! Proceeding...")
                 automation.close()
         else:
             # First check login status before asking for product URL
@@ -846,6 +836,29 @@ def main():
             print("Author: flenco.in")
             print("Support: https://buymeacoffee.com/atishpaul")
             print("="*60)
+            
+            # Show main menu
+            print("\nMain Menu:")
+            print("1. Start Automation")
+            print("2. Logout (Clear saved login data)")
+            print("3. Exit")
+            
+            choice = input("\nChoose option (1, 2, or 3): ").strip()
+            
+            if choice == "2":
+                # Logout option
+                print("\nLogging out...")
+                automation.setup_driver()
+                automation.close(logout=True)
+                print("✅ Logged out successfully! User data cleared.")
+                return
+            elif choice == "3":
+                print("Goodbye!")
+                return
+            elif choice != "1":
+                print("❌ Invalid choice!")
+                return
+            
             print("\nStep 1: Checking login status...")
 
             # Setup driver and check login first
@@ -855,10 +868,10 @@ def main():
             if not is_logged_in:
                 login_success = automation.wait_for_login()
                 if not login_success:
-                    print("ERROR: Login cancelled or failed.")
+                    print("❌ Login cancelled or failed.")
                     return
             else:
-                print("SUCCESS: Already logged in! Proceeding...")
+                print("✅ Already logged in! Proceeding...")
                 automation.close()
 
             print("\nStep 2: Getting automation details...")
@@ -866,16 +879,16 @@ def main():
             user_inputs = automation.get_user_inputs()
 
             if not user_inputs['product_url']:
-                print("ERROR: No product URL provided!")
+                print("❌ No product URL provided!")
                 return
 
             # Handle scheduling
             if user_inputs['scheduled_time']:
                 automation.save_schedule(user_inputs)
-                print(f"\nSUCCESS: Automation scheduled for {user_inputs['scheduled_time'].strftime('%d/%m/%Y at %H:%M')}")
-                print("INFO: Keep this tool running for scheduled execution")
+                print(f"\n✅ Automation scheduled for {user_inputs['scheduled_time'].strftime('%d/%m/%Y at %H:%M')}")
+                print("Keep this tool running for scheduled execution")
                 print(f"⏳ Waiting for scheduled time: {user_inputs['scheduled_time'].strftime('%d/%m/%Y at %H:%M')}")
-                print("💡 Press Ctrl+C to cancel scheduled execution")
+                print("Press Ctrl+C to cancel scheduled execution")
 
                 try:
                     while datetime.now() < user_inputs['scheduled_time']:
@@ -889,7 +902,7 @@ def main():
                     # Continue to automation execution
 
                 except KeyboardInterrupt:
-                    print("\n❌ Scheduled execution cancelled by user")
+                    print("\nScheduled execution cancelled by user")
                     automation.clear_schedule()
                     return
 
@@ -900,9 +913,9 @@ def main():
         input("\nAutomation completed! Press Enter to close browser...")
 
     except KeyboardInterrupt:
-        print("\nINFO: Automation stopped by user.")
+        print("\nAutomation stopped by user.")
     except Exception as e:
-        print(f"ERROR: Unexpected error: {e}")
+        print(f"❌ Unexpected error: {e}")
     finally:
         automation.close()
 
