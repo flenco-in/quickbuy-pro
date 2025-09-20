@@ -38,14 +38,16 @@
 
    **Or run directly with Python:**
    ```bash
-   python flipkart_automation.py
+   python automation.py
    ```
 
 ### What's Included
-- ✅ **Cross-Platform ChromeDrivers** - Pre-included for Windows, macOS, and Linux
+- ✅ **Automatic ChromeDriver Management** - Downloads correct version automatically
+- ✅ **Cross-Platform Support** - Works on Windows, macOS, and Linux
 - ✅ **Automatic OS Detection** - Script detects your platform automatically
 - ✅ **Minimal Dependencies** - Only requires Python and Selenium
 - ✅ **User Data Persistence** - Login data saved locally
+- ✅ **No Manual Setup** - Everything handled automatically
 
 ## How It Works
 
@@ -94,17 +96,32 @@ Run automation immediately after login
 ## Project Structure
 
 ```
-one-click-buy-fk/
-├── chromedriver          # macOS ChromeDriver
-├── chromedriver-linux    # Linux ChromeDriver
-├── chromedriver.exe      # Windows ChromeDriver
-├── flipkart_automation.py # Main automation script
-├── requirements.txt      # Python dependencies
-├── run.sh               # Unix/macOS/Linux runner
-├── run.bat              # Windows runner
-├── readme.md            # This file
-└── user_data/           # User data storage (auto-created)
+quickbuy-pro/
+├── automation.py               # Main automation script
+├── requirements.txt            # Python dependencies
+├── run.sh                      # Unix/macOS/Linux runner
+├── run.bat                     # Windows runner
+├── readme.md                   # This file
+└── user_data/                  # User data storage (auto-created, ignored by git)
 ```
+
+## Windows Compatibility
+
+✅ **Fully Windows Compatible!** 
+
+The script has been thoroughly tested for Windows compatibility:
+
+- ✅ **Windows 10/11 Support** - Tested on latest Windows versions
+- ✅ **Path Handling** - Proper Windows path handling (`C:\Users\...`)
+- ✅ **Chrome Detection** - Finds Chrome in all standard Windows locations
+- ✅ **WebDriver Manager** - Automatic ChromeDriver download for Windows
+- ✅ **Batch File Runner** - `run.bat` for easy Windows execution
+
+### Windows-Specific Features:
+- **Multiple Chrome Paths**: Checks Program Files, Program Files (x86), and LocalAppData
+- **Windows Path Support**: Handles both forward and backward slashes
+- **Batch Script**: `run.bat` provides native Windows experience
+- **Error Handling**: Windows-specific error messages and solutions
 
 ## Troubleshooting
 

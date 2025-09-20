@@ -1,1 +1,38 @@
-/user_data
+# User data directories (automatically created by the script)
+user_data/
+temp_user_data/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Schedule files (temporary)
+schedule.pkl
+
+# ChromeDriver cache (managed by webdriver-manager)
+~/.wdm/
+
+# Log files
+*.log
+
+# Test files (optional - remove if you want to keep them)
+test_*.py

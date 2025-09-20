@@ -24,8 +24,10 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 class QuickBuyPro:
     def __init__(self):
         self.driver = None
+        # Use single user data directory
         self.user_data_dir = os.path.join(os.getcwd(), "user_data")
         self.schedule_file = "schedule.pkl"
+        self.is_logged_in = False
         self.step_descriptions = [
             "Opening product page",
             "Clicking Buy Now button",
@@ -41,31 +43,6 @@ class QuickBuyPro:
             "Clicking final payment button"
         ]
 
-    def get_chromedriver_path(self):
-        """Get the correct ChromeDriver path based on the operating system"""
-        system = platform.system().lower()
-        
-        if system == "windows":
-            chromedriver_path = os.path.join(os.getcwd(), "chromedriver.exe")
-        elif system == "linux":
-            chromedriver_path = os.path.join(os.getcwd(), "chromedriver-linux")
-        elif system == "darwin":  # macOS
-            chromedriver_path = os.path.join(os.getcwd(), "chromedriver")
-            # For ARM64 Macs, verify the binary is compatible
-            if platform.machine() == "arm64" and os.path.exists(chromedriver_path):
-                try:
-                    # Check if the binary is executable and ARM64 compatible
-                    import subprocess
-                    result = subprocess.run(['file', chromedriver_path], capture_output=True, text=True)
-                    if 'arm64' not in result.stdout:
-                        print(f"WARNING: Local ChromeDriver may not be ARM64 compatible: {result.stdout.strip()}")
-                except:
-                    pass
-        else:
-            # Fallback to macOS version
-            chromedriver_path = os.path.join(os.getcwd(), "chromedriver")
-        
-        return chromedriver_path
 
     def validate_url(self, url):
         """Validate and clean URL before opening"""
@@ -94,7 +71,41 @@ class QuickBuyPro:
         """Setup Chrome driver with user data persistence"""
         chrome_options = Options()
         
-        # Validate user data directory path
+        # Clean up any existing Chrome processes and locks
+        try:
+            import subprocess
+            subprocess.run(['pkill', '-f', 'chrome'], capture_output=True)
+            subprocess.run(['pkill', '-f', 'chromedriver'], capture_output=True)
+            time.sleep(2)  # Wait for processes to fully terminate
+        except:
+            pass
+        
+        # Clean up existing user data directory if it exists and has conflicts
+        if os.path.exists(self.user_data_dir):
+            try:
+                # Check for lock files
+                lock_files = [
+                    os.path.join(self.user_data_dir, "Default", "SingletonLock*"),
+                    os.path.join(self.user_data_dir, "SingletonLock*")
+                ]
+                has_locks = False
+                for lock_pattern in lock_files:
+                    import glob
+                    for lock_file in glob.glob(lock_pattern):
+                        has_locks = True
+                        try:
+                            os.remove(lock_file)
+                        except:
+                            pass
+                
+                if has_locks:
+                    print(f"INFO: Cleaned up lock files in existing user data directory")
+                else:
+                    print(f"INFO: Using existing user data directory: {self.user_data_dir}")
+            except Exception as e:
+                print(f"WARNING: Could not clean existing user data directory: {e}")
+        
+        # Create user data directory if it doesn't exist
         if not os.path.exists(self.user_data_dir):
             try:
                 os.makedirs(self.user_data_dir, exist_ok=True)
@@ -129,37 +140,29 @@ class QuickBuyPro:
             print(f"WARNING: Error setting Chrome options: {e}")
 
         try:
-            # Try to use OS-specific local ChromeDriver first
-            local_chromedriver = self.get_chromedriver_path()
-            if os.path.exists(local_chromedriver):
-                # Make sure the ChromeDriver is executable
-                os.chmod(local_chromedriver, 0o755)
-                service = Service(local_chromedriver)
-                self.driver = webdriver.Chrome(service=service, options=chrome_options)
-                print(f"✅ Using local ChromeDriver: {os.path.basename(local_chromedriver)}")
-            else:
-                # Fallback to system ChromeDriver
-                self.driver = webdriver.Chrome(options=chrome_options)
-                print("✅ Using system ChromeDriver")
-        except Exception as e1:
-            print(f"INFO: Local ChromeDriver failed: {e1}")
-            # Fallback to webdriver-manager with ARM64 support
-            try:
-                from webdriver_manager.chrome import ChromeDriverManager
-                
-                # For ARM64 Macs, webdriver-manager should automatically detect the correct version
-                if platform.system().lower() == "darwin" and platform.machine() == "arm64":
-                    print("INFO: Detected ARM64 Mac, using webdriver-manager...")
-                
-                service = Service(ChromeDriverManager().install())
-                self.driver = webdriver.Chrome(service=service, options=chrome_options)
-                print("✅ Using webdriver-manager ChromeDriver")
-            except Exception as e2:
-                print(f"❌ ChromeDriver setup failed: {e2}")
-                print("💡 Please install Chrome browser and make sure it's updated")
-                print("💡 Try running: pip install --upgrade selenium webdriver-manager")
-                print("💡 For ARM64 Macs, ensure you have the latest Chrome browser installed")
-                raise
+            # Use webdriver-manager to automatically download and manage ChromeDriver
+            from webdriver_manager.chrome import ChromeDriverManager
+            
+            # For ARM64 Macs, clear any corrupted cache first (silently)
+            if platform.system().lower() == "darwin" and platform.machine() == "arm64":
+                import shutil
+                cache_path = os.path.expanduser("~/.wdm/drivers/chromedriver/")
+                if os.path.exists(cache_path):
+                    try:
+                        shutil.rmtree(cache_path)
+                    except:
+                        pass
+            
+            # Download and setup ChromeDriver (silently)
+            service = Service(ChromeDriverManager().install())
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            
+        except Exception as e:
+            print(f"❌ ChromeDriver setup failed: {e}")
+            print("💡 Please install Chrome browser and make sure it's updated")
+            print("💡 Try running: pip install --upgrade selenium webdriver-manager")
+            print("💡 For ARM64 Macs, ensure you have the latest Chrome browser installed")
+            raise
 
         # Remove automation indicators
         try:
@@ -184,6 +187,7 @@ class QuickBuyPro:
             try:
                 profile_info = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Profile Information')]")
                 print("SUCCESS: User is logged in! Profile Information found.")
+                self.is_logged_in = True
                 return True
             except NoSuchElementException:
                 pass
@@ -192,6 +196,7 @@ class QuickBuyPro:
             try:
                 login_element = self.driver.find_element(By.CLASS_NAME, "PbekyG.xrBehW")
                 print("SUCCESS: User is logged in! Login indicator class found.")
+                self.is_logged_in = True
                 return True
             except NoSuchElementException:
                 pass
@@ -199,10 +204,12 @@ class QuickBuyPro:
             # If neither found, user is not logged in
             print("WARNING: User is not logged in. Redirected to login page.")
             print("INFO: Please login in the browser. System will automatically detect when you're logged in.")
+            self.is_logged_in = False
             return False
 
         except Exception as e:
             print(f"ERROR: Error checking login status: {e}")
+            self.is_logged_in = False
             return False
 
     def wait_for_login(self):
@@ -223,6 +230,7 @@ class QuickBuyPro:
                     print("SUCCESS: Login detected! Profile Information found.")
                     print("INFO: User data has been saved. You'll stay logged in for next time.")
                     print("INFO: Closing browser and proceeding with automation...")
+                    self.is_logged_in = True
                     self.close()
                     return True
                 except NoSuchElementException:
@@ -234,6 +242,7 @@ class QuickBuyPro:
                     print("SUCCESS: Login detected! Login indicator class found.")
                     print("INFO: User data has been saved. You'll stay logged in for next time.")
                     print("INFO: Closing browser and proceeding with automation...")
+                    self.is_logged_in = True
                     self.close()
                     return True
                 except NoSuchElementException:
@@ -696,12 +705,26 @@ class QuickBuyPro:
                     step['Value'] = user_inputs['cvv']
 
     def close(self):
-        """Close the browser and save user data"""
+        """Close the browser and manage user data based on login status"""
         if self.driver:
-            print("INFO: Saving user data...")
-            time.sleep(2)
-            self.driver.quit()
-            print("SUCCESS: Browser closed. User data saved!")
+            if self.is_logged_in:
+                print("INFO: Saving user data...")
+                time.sleep(2)
+                self.driver.quit()
+                print("SUCCESS: Browser closed. User data saved!")
+            else:
+                print("INFO: User not logged in, cleaning up user data...")
+                time.sleep(2)
+                self.driver.quit()
+                # Delete user data directory if user is not logged in
+                try:
+                    import shutil
+                    if os.path.exists(self.user_data_dir):
+                        shutil.rmtree(self.user_data_dir)
+                        print("INFO: User data directory cleaned up.")
+                except Exception as e:
+                    print(f"WARNING: Could not clean user data directory: {e}")
+                print("SUCCESS: Browser closed. User data cleaned up!")
 
 def check_scheduled_execution():
     """Check if there's a scheduled execution on startup"""
