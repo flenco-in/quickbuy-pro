@@ -51,6 +51,16 @@ class QuickBuyPro:
             chromedriver_path = os.path.join(os.getcwd(), "chromedriver-linux")
         elif system == "darwin":  # macOS
             chromedriver_path = os.path.join(os.getcwd(), "chromedriver")
+            # For ARM64 Macs, verify the binary is compatible
+            if platform.machine() == "arm64" and os.path.exists(chromedriver_path):
+                try:
+                    # Check if the binary is executable and ARM64 compatible
+                    import subprocess
+                    result = subprocess.run(['file', chromedriver_path], capture_output=True, text=True)
+                    if 'arm64' not in result.stdout:
+                        print(f"WARNING: Local ChromeDriver may not be ARM64 compatible: {result.stdout.strip()}")
+                except:
+                    pass
         else:
             # Fallback to macOS version
             chromedriver_path = os.path.join(os.getcwd(), "chromedriver")
@@ -122,6 +132,8 @@ class QuickBuyPro:
             # Try to use OS-specific local ChromeDriver first
             local_chromedriver = self.get_chromedriver_path()
             if os.path.exists(local_chromedriver):
+                # Make sure the ChromeDriver is executable
+                os.chmod(local_chromedriver, 0o755)
                 service = Service(local_chromedriver)
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
                 print(f"✅ Using local ChromeDriver: {os.path.basename(local_chromedriver)}")
@@ -131,9 +143,14 @@ class QuickBuyPro:
                 print("✅ Using system ChromeDriver")
         except Exception as e1:
             print(f"INFO: Local ChromeDriver failed: {e1}")
-            # Fallback to webdriver-manager
+            # Fallback to webdriver-manager with ARM64 support
             try:
                 from webdriver_manager.chrome import ChromeDriverManager
+                
+                # For ARM64 Macs, webdriver-manager should automatically detect the correct version
+                if platform.system().lower() == "darwin" and platform.machine() == "arm64":
+                    print("INFO: Detected ARM64 Mac, using webdriver-manager...")
+                
                 service = Service(ChromeDriverManager().install())
                 self.driver = webdriver.Chrome(service=service, options=chrome_options)
                 print("✅ Using webdriver-manager ChromeDriver")
@@ -141,6 +158,7 @@ class QuickBuyPro:
                 print(f"❌ ChromeDriver setup failed: {e2}")
                 print("💡 Please install Chrome browser and make sure it's updated")
                 print("💡 Try running: pip install --upgrade selenium webdriver-manager")
+                print("💡 For ARM64 Macs, ensure you have the latest Chrome browser installed")
                 raise
 
         # Remove automation indicators
