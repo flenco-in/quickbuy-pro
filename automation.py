@@ -74,32 +74,65 @@ class QuickBuyPro:
         # Clean up any existing Chrome processes and locks
         try:
             import subprocess
+            import signal
+            
+            # Try to use psutil for more aggressive process killing
+            try:
+                import psutil
+                # Kill all Chrome processes more aggressively
+                for proc in psutil.process_iter(['pid', 'name']):
+                    try:
+                        if proc.info['name'] and ('chrome' in proc.info['name'].lower() or 'chromedriver' in proc.info['name'].lower()):
+                            proc.kill()
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        pass
+            except ImportError:
+                print("INFO: psutil not available, using basic process cleanup")
+            
+            # Also try traditional pkill as backup
             subprocess.run(['pkill', '-f', 'chrome'], capture_output=True)
             subprocess.run(['pkill', '-f', 'chromedriver'], capture_output=True)
-            time.sleep(2)  # Wait for processes to fully terminate
+            subprocess.run(['pkill', '-9', '-f', 'chrome'], capture_output=True)
+            subprocess.run(['pkill', '-9', '-f', 'chromedriver'], capture_output=True)
+            
+            time.sleep(3)  # Wait longer for processes to fully terminate
         except:
             pass
         
         # Clean up existing user data directory if it exists and has conflicts
         if os.path.exists(self.user_data_dir):
             try:
-                # Check for lock files
+                import glob
+                import shutil
+                
+                # Check for lock files and remove them
                 lock_files = [
                     os.path.join(self.user_data_dir, "Default", "SingletonLock*"),
-                    os.path.join(self.user_data_dir, "SingletonLock*")
+                    os.path.join(self.user_data_dir, "SingletonLock*"),
+                    os.path.join(self.user_data_dir, "Default", "LOCK"),
+                    os.path.join(self.user_data_dir, "LOCK")
                 ]
                 has_locks = False
                 for lock_pattern in lock_files:
-                    import glob
                     for lock_file in glob.glob(lock_pattern):
                         has_locks = True
                         try:
-                            os.remove(lock_file)
+                            if os.path.isfile(lock_file):
+                                os.remove(lock_file)
+                            elif os.path.isdir(lock_file):
+                                shutil.rmtree(lock_file)
                         except:
                             pass
                 
+                # If we found locks, wait a bit more and try to clean the entire directory
                 if has_locks:
-                    print(f"INFO: Cleaned up lock files in existing user data directory")
+                    print(f"INFO: Found lock files, cleaning user data directory...")
+                    time.sleep(2)
+                    try:
+                        shutil.rmtree(self.user_data_dir)
+                        print(f"INFO: Removed existing user data directory")
+                    except:
+                        print(f"WARNING: Could not remove user data directory, will try to use it")
                 else:
                     print(f"INFO: Using existing user data directory: {self.user_data_dir}")
             except Exception as e:

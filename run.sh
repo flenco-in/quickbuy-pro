@@ -175,4 +175,5 @@ echo "=========================================="
 echo ""
 
 # Run the automation script
+cd "$(dirname "$0")"
 exec $PYTHON_CMD automation.py
