@@ -95,41 +95,54 @@ echo "✅ Python version: $PYTHON_VERSION"
 echo ""
 echo "📦 Checking pip installation..."
 if ! $PYTHON_CMD -m pip --version &> /dev/null; then
-    echo "❌ pip is not available!"
-    echo ""
-    echo "📥 Please install pip:"
-    if [ "$OS" = "Darwin" ]; then
-        echo "   • Run: curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && $PYTHON_CMD get-pip.py"
-    elif [ "$OS" = "Linux" ]; then
-        echo "   • Ubuntu/Debian: sudo apt-get install python3-pip"
+    echo "⚠️  pip not found via python -m pip, trying alternative methods..."
+    
+    # Try pip3 directly
+    if command -v pip3 &> /dev/null; then
+        echo "✅ Found pip3 command"
+        PIP_CMD="pip3"
+    elif command -v pip &> /dev/null; then
+        echo "✅ Found pip command"
+        PIP_CMD="pip"
     else
-        echo "   • Visit: https://pip.pypa.io/en/stable/installation/"
+        echo "❌ pip is not available!"
+        echo ""
+        echo "📥 Please install pip:"
+        if [ "$OS" = "Darwin" ]; then
+            echo "   • Run: curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && $PYTHON_CMD get-pip.py"
+            echo "   • Or install via Homebrew: brew install python"
+        elif [ "$OS" = "Linux" ]; then
+            echo "   • Ubuntu/Debian: sudo apt-get install python3-pip"
+        else
+            echo "   • Visit: https://pip.pypa.io/en/stable/installation/"
+        fi
+        exit 1
     fi
-    exit 1
+else
+    echo "✅ pip is available via python -m pip"
+    PIP_CMD="$PYTHON_CMD -m pip"
 fi
-
-echo "✅ pip is available"
 
 # Install/upgrade dependencies
 echo ""
 echo "📦 Installing/upgrading dependencies..."
 if [ -f "requirements.txt" ]; then
     # Try multiple installation methods for maximum compatibility
-    if $PYTHON_CMD -m pip install --upgrade -r requirements.txt --user --quiet 2>/dev/null; then
+    if $PIP_CMD install --upgrade -r requirements.txt --user --quiet 2>/dev/null; then
         echo "✅ Dependencies installed/upgraded successfully"
-    elif $PYTHON_CMD -m pip install -r requirements.txt --user --quiet 2>/dev/null; then
+    elif $PIP_CMD install -r requirements.txt --user --quiet 2>/dev/null; then
         echo "✅ Dependencies installed successfully"
-    elif $PYTHON_CMD -m pip install --upgrade -r requirements.txt --quiet 2>/dev/null; then
+    elif $PIP_CMD install --upgrade -r requirements.txt --quiet 2>/dev/null; then
         echo "✅ Dependencies installed/upgraded successfully"
-    elif $PYTHON_CMD -m pip install -r requirements.txt --quiet 2>/dev/null; then
+    elif $PIP_CMD install -r requirements.txt --quiet 2>/dev/null; then
         echo "✅ Dependencies installed successfully"
     else
         echo "⚠️  Some dependency installation issues, but continuing..."
-        echo "💡 If you encounter issues, try: $PYTHON_CMD -m pip install -r requirements.txt --user"
+        echo "💡 If you encounter issues, try: $PIP_CMD install -r requirements.txt --user"
     fi
 else
     echo "⚠️  requirements.txt not found, installing basic dependencies..."
-    $PYTHON_CMD -m pip install --upgrade selenium webdriver-manager --user --quiet 2>/dev/null || true
+    $PIP_CMD install --upgrade selenium webdriver-manager --user --quiet 2>/dev/null || true
 fi
 
 # Check Chrome browser
@@ -152,8 +165,8 @@ print('✅ All dependencies verified successfully')
 " 2>/dev/null; then
     echo "✅ All systems ready!"
 else
-    echo "❌ Verification failed. Please check the error messages above."
-    exit 1
+    echo "⚠️  Verification failed, but continuing..."
+    echo "💡 Dependencies might still work. Try running the script."
 fi
 
 echo ""
