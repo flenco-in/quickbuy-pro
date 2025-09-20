@@ -13,6 +13,11 @@ import platform
 from datetime import datetime, timedelta
 import pickle
 import urllib.parse
+
+# Suppress debug logs
+import warnings
+warnings.filterwarnings("ignore")
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logs
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -168,13 +173,33 @@ class QuickBuyPro:
             chrome_options.add_argument("--disable-renderer-backgrounding")
             chrome_options.add_argument("--disable-features=TranslateUI")
             chrome_options.add_argument("--disable-ipc-flooding-protection")
-            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_argument("--log-level=3")  # Suppress INFO, WARNING, ERROR
+            chrome_options.add_argument("--silent")
+            chrome_options.add_argument("--disable-logging")
+            chrome_options.add_argument("--disable-default-apps")
+            chrome_options.add_argument("--disable-sync")
+            chrome_options.add_argument("--disable-background-networking")
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
             chrome_options.add_experimental_option('useAutomationExtension', False)
             chrome_options.add_experimental_option("detach", True)
+
+            # Suppress Chrome DevTools and other debug output
+            chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+            chrome_options.add_experimental_option('useAutomationExtension', False)
+            chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--no-first-run')
+            chrome_options.add_argument('--no-default-browser-check')
+            chrome_options.add_argument('--disable-infobars')
+            chrome_options.add_argument('--disable-gpu-sandbox')
+            chrome_options.add_argument('--disable-software-rasterizer')
         except Exception as e:
             pass
 
         try:
+            # Suppress webdriver-manager logs
+            import logging
+            logging.getLogger('WDM').setLevel(logging.WARNING)
+
             # Use webdriver-manager to automatically download and manage ChromeDriver
             from webdriver_manager.chrome import ChromeDriverManager
             
@@ -193,10 +218,10 @@ class QuickBuyPro:
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             
         except Exception as e:
-            print(f"❌ ChromeDriver setup failed: {e}")
-            print("💡 Please install Chrome browser and make sure it's updated")
-            print("💡 Try running: pip install --upgrade selenium webdriver-manager")
-            print("💡 For ARM64 Macs, ensure you have the latest Chrome browser installed")
+            print(f"ERROR: ChromeDriver setup failed: {e}")
+            print("Please install Chrome browser and make sure it's updated")
+            print("Try running: pip install --upgrade selenium webdriver-manager")
+            print("For ARM64 Macs, ensure you have the latest Chrome browser installed")
             raise
 
         # Remove automation indicators
@@ -209,7 +234,6 @@ class QuickBuyPro:
 
     def check_login_status(self):
         """Check if user is logged in by visiting profile page"""
-        print("Checking login status...")
 
         try:
             self.driver.get("https://www.flipkart.com/account/?rd=0&link=home_account")
@@ -221,7 +245,7 @@ class QuickBuyPro:
             # Check for "Profile Information" text
             try:
                 profile_info = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Profile Information')]")
-                print("✅ User is logged in!")
+                print("User is logged in!")
                 self.is_logged_in = True
                 return True
             except NoSuchElementException:
@@ -230,20 +254,20 @@ class QuickBuyPro:
             # Check for login indicator class
             try:
                 login_element = self.driver.find_element(By.CLASS_NAME, "PbekyG.xrBehW")
-                print("✅ User is logged in!")
+                print("User is logged in!")
                 self.is_logged_in = True
                 return True
             except NoSuchElementException:
                 pass
 
             # If neither found, user is not logged in
-            print("❌ User is not logged in.")
+            print("User is not logged in.")
             print("Please login in the browser. System will automatically detect when you're logged in.")
             self.is_logged_in = False
             return False
 
         except Exception as e:
-            print(f"❌ Error checking login status: {e}")
+            print(f"ERROR: Checking login status: {e}")
             self.is_logged_in = False
             return False
 
@@ -262,7 +286,7 @@ class QuickBuyPro:
                 # Check for "Profile Information" text
                 try:
                     profile_info = self.driver.find_element(By.XPATH, "//*[contains(text(), 'Profile Information')]")
-                    print("✅ Login detected!")
+                    print("Login detected!")
                     print("User data has been saved. You'll stay logged in for next time.")
                     print("Closing browser and proceeding with automation...")
                     self.is_logged_in = True
@@ -274,7 +298,7 @@ class QuickBuyPro:
                 # Check for login indicator class
                 try:
                     login_element = self.driver.find_element(By.CLASS_NAME, "PbekyG.xrBehW")
-                    print("✅ Login detected!")
+                    print("Login detected!")
                     print("User data has been saved. You'll stay logged in for next time.")
                     print("Closing browser and proceeding with automation...")
                     self.is_logged_in = True
@@ -557,7 +581,7 @@ class QuickBuyPro:
                 # Validate and clean URL before opening
                 cleaned_url, error = self.validate_url(target)
                 if error:
-                    print(f"❌ {error}")
+                    print(f"ERROR: {error}")
                     return False
                 
                 try:
@@ -566,7 +590,7 @@ class QuickBuyPro:
                     # Check for popups after page load
                     self.check_and_handle_popups()
                 except Exception as url_error:
-                    print(f"❌ Failed to open URL: {url_error}")
+                    print(f"ERROR: Failed to open URL: {url_error}")
                     return False
 
             elif cmd_type == 'click':
@@ -616,7 +640,7 @@ class QuickBuyPro:
             return True
 
         except Exception as e:
-            print(f"❌ Error executing command {cmd_type}: {e}")
+            print(f"ERROR: Executing command {cmd_type}: {e}")
             return False
 
     def find_element_by_target(self, target, targets=None):
@@ -710,10 +734,10 @@ class QuickBuyPro:
             success = self.execute_command(step)
 
             if not success:
-                print(f"   ⚠️  Step failed, continuing...")
+                print(f"   WARNING: Step failed, continuing...")
                 continue
             else:
-                print(f"   ✅ Completed")
+                print(f"   Completed")
 
         print("\nAutomation completed successfully!")
 
@@ -743,11 +767,11 @@ class QuickBuyPro:
                         shutil.rmtree(self.user_data_dir)
                 except Exception as e:
                     pass
-                print("✅ Browser closed. User logged out!")
+                print("Browser closed. User logged out!")
             else:
                 time.sleep(2)
                 self.driver.quit()
-                print("✅ Browser closed. User data saved!")
+                print("Browser closed. User data saved!")
 
 def check_scheduled_execution():
     """Check if there's a scheduled execution on startup"""
@@ -758,15 +782,15 @@ def check_scheduled_execution():
         scheduled_time = scheduled_data['scheduled_time']
         if scheduled_time and scheduled_time > datetime.now():
             print("\n" + "="*60)
-            print("⏰ SCHEDULED EXECUTION FOUND")
+            print("SCHEDULED EXECUTION FOUND")
             print("="*60)
-            print(f"📅 Execution scheduled for: {scheduled_time.strftime('%d/%m/%Y at %H:%M')}")
+            print(f"Execution scheduled for: {scheduled_time.strftime('%d/%m/%Y at %H:%M')}")
             remaining_time = scheduled_time - datetime.now()
             hours, remainder = divmod(int(remaining_time.total_seconds()), 3600)
             minutes, seconds = divmod(remainder, 60)
-            print(f"⏳ Time remaining: {hours:02d}:{minutes:02d}:{seconds:02d}")
-            print(f"🛍️  Product: {scheduled_data.get('product_url', 'N/A')[:50]}...")
-            print(f"💳 Card prefill: {'Yes' if scheduled_data.get('card_number', '') else 'No'}")
+            print(f"Time remaining: {hours:02d}:{minutes:02d}:{seconds:02d}")
+            print(f"Product: {scheduled_data.get('product_url', 'N/A')[:50]}...")
+            print(f"Card prefill: {'Yes' if scheduled_data.get('card_number', '') else 'No'}")
             print("\nOptions:")
             print("1. Wait for scheduled time")
             print("2. Execute now")
@@ -779,18 +803,18 @@ def check_scheduled_execution():
                 return scheduled_data
             elif choice == "3":
                 automation.clear_schedule()
-                print("✅ Scheduled execution cancelled")
+                print("Scheduled execution cancelled")
                 return None
             else:
-                print(f"⏳ Waiting for scheduled time: {scheduled_time.strftime('%d/%m/%Y at %H:%M')}")
-                print("💡 Keep this tool running. Press Ctrl+C to cancel.")
+                print(f"Waiting for scheduled time: {scheduled_time.strftime('%d/%m/%Y at %H:%M')}")
+                print("Keep this tool running. Press Ctrl+C to cancel.")
 
                 try:
                     while datetime.now() < scheduled_time:
                         time.sleep(30)  # Check every 30 seconds
                         remaining = scheduled_time - datetime.now()
                         if remaining.total_seconds() <= 60:
-                            print(f"⏰ Starting in {int(remaining.total_seconds())} seconds...")
+                            print(f"Starting in {int(remaining.total_seconds())} seconds...")
 
                     automation.clear_schedule()
                     return scheduled_data
@@ -823,10 +847,10 @@ def main():
             if not is_logged_in:
                 login_success = automation.wait_for_login()
                 if not login_success:
-                    print("❌ Login cancelled or failed.")
+                    print("ERROR: Login cancelled or failed.")
                     return
             else:
-                print("✅ Already logged in! Proceeding...")
+                print("Already logged in! Proceeding...")
                 automation.close()
         else:
             # First check login status before asking for product URL
@@ -850,13 +874,13 @@ def main():
                 print("\nLogging out...")
                 automation.setup_driver()
                 automation.close(logout=True)
-                print("✅ Logged out successfully! User data cleared.")
+                print("Logged out successfully! User data cleared.")
                 return
             elif choice == "3":
                 print("Goodbye!")
                 return
             elif choice != "1":
-                print("❌ Invalid choice!")
+                print("ERROR: Invalid choice!")
                 return
             
             print("\nStep 1: Checking login status...")
@@ -868,10 +892,10 @@ def main():
             if not is_logged_in:
                 login_success = automation.wait_for_login()
                 if not login_success:
-                    print("❌ Login cancelled or failed.")
+                    print("ERROR: Login cancelled or failed.")
                     return
             else:
-                print("✅ Already logged in! Proceeding...")
+                print("Already logged in! Proceeding...")
                 automation.close()
 
             print("\nStep 2: Getting automation details...")
@@ -879,15 +903,15 @@ def main():
             user_inputs = automation.get_user_inputs()
 
             if not user_inputs['product_url']:
-                print("❌ No product URL provided!")
+                print("ERROR: No product URL provided!")
                 return
 
             # Handle scheduling
             if user_inputs['scheduled_time']:
                 automation.save_schedule(user_inputs)
-                print(f"\n✅ Automation scheduled for {user_inputs['scheduled_time'].strftime('%d/%m/%Y at %H:%M')}")
+                print(f"\nAutomation scheduled for {user_inputs['scheduled_time'].strftime('%d/%m/%Y at %H:%M')}")
                 print("Keep this tool running for scheduled execution")
-                print(f"⏳ Waiting for scheduled time: {user_inputs['scheduled_time'].strftime('%d/%m/%Y at %H:%M')}")
+                print(f"Waiting for scheduled time: {user_inputs['scheduled_time'].strftime('%d/%m/%Y at %H:%M')}")
                 print("Press Ctrl+C to cancel scheduled execution")
 
                 try:
@@ -895,10 +919,10 @@ def main():
                         time.sleep(30)  # Check every 30 seconds
                         remaining = user_inputs['scheduled_time'] - datetime.now()
                         if remaining.total_seconds() <= 60:
-                            print(f"⏰ Starting in {int(remaining.total_seconds())} seconds...")
+                            print(f"Starting in {int(remaining.total_seconds())} seconds...")
 
                     automation.clear_schedule()
-                    print("\n🚀 Starting scheduled automation...")
+                    print("\nStarting scheduled automation...")
                     # Continue to automation execution
 
                 except KeyboardInterrupt:
@@ -915,7 +939,7 @@ def main():
     except KeyboardInterrupt:
         print("\nAutomation stopped by user.")
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f"ERROR: Unexpected error: {e}")
     finally:
         automation.close()
 
